@@ -1,0 +1,5 @@
+{
+  "versionName": "1.9.0",
+  "notes": "- Uygulama içi güncelleme: yeni sürüm çıktığında uygulama açılışta haber verir, \"Güncelle\" ile indirip kurar.\n- Geçmiş: her sürüş tek kart, şarjlar ayrı satır; önceki sürümlerin kayıtlarından da kartlar oluşturulur.\n- Geri tuşu: Panel'de uygulamayı kapatır, araca bağlıysan sorar.",
+  "apkUrl": "https://github.com/balistic00/NiroDrive-releases/releases/download/v1.9.0/NiroDrive-v1.9.0.apk"
+}
