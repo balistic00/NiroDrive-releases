@@ -1,5 +1,5 @@
 {
-  "versionName": "1.9.0",
-  "notes": "- Uygulama içi güncelleme: yeni sürüm çıktığında uygulama açılışta haber verir, \"Güncelle\" ile indirip kurar.\n- Geçmiş: her sürüş tek kart, şarjlar ayrı satır; önceki sürümlerin kayıtlarından da kartlar oluşturulur.\n- Geri tuşu: Panel'de uygulamayı kapatır, araca bağlıysan sorar.",
-  "apkUrl": "https://github.com/balistic00/NiroDrive-releases/releases/download/v1.9.0/NiroDrive-v1.9.0.apk"
+  "versionName": "1.10.0",
+  "notes": "- Yolculuk planlama ilk uzun yol logunla (Ankara→Erzurum) ayarlandı: uzun yol tüketimi artık gerçeğe yakın (önceki tahmin %7–18 düşüktü).\n- Şarj molası süresi gerçek şarj eğrisiyle hesaplanıyor: %65'e kadar hızlı, %75 üstü yavaş. %80 üstüne şarj etmenin ne kadar zaman kaybettirdiği görülüyor.\n- Ana ekranda hız artık araç göstergesine göre gösteriliyor (gösterge gerçek hızdan ~%4 fazla gösterir); altında GPS'e göre gerçek hız ve anlık rakım var. Mesafe ve tüketim hesapları gerçek hızla yapılmaya devam ediyor.\n- Telefon bağlı değilken yapılan şarj (ör. gece otelde) yeniden bağlanınca şarj yüzdesi artışından algılanıp geçmişe ekleniyor. Log şarjın ortasında durduysa o şarj kaydı tamamlanıyor.",
+  "apkUrl": "https://github.com/balistic00/NiroDrive-releases/releases/download/v1.10.0/NiroDrive-v1.10.0.apk"
 }
