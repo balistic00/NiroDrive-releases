@@ -11,15 +11,15 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+    # İlk çalıştırmada ~13.000 istasyonun detayı yavaşça sorulur (birkaç saat); sonraki haftalar yalnızca yeni istasyonlar.
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Listeyi yenile
-        env:
-          OCM_API_KEY: ${{ secrets.OCM_API_KEY }}
-        run: python3 scripts/update_chargers.py --out chargers_tr.json
+        run: python3 scripts/update_chargers.py --out chargers_tr.json --workers 4 --delay 0.1 --budget 320
       - name: Değiştiyse kaydet
         run: |
           if git diff --quiet chargers_tr.json; then echo "Değişiklik yok"; exit 0; fi
@@ -27,4 +27,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add chargers_tr.json
           git commit -m "chargers: $(date -u +%F)"
+          git pull --rebase -q
           git push

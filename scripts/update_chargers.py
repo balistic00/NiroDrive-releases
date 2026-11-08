@@ -1,115 +1,125 @@
 #!/usr/bin/env python3
-"""Türkiye şarj istasyonu listesini (chargers_tr.json) üretir.
-
-Kaynaklar: OpenStreetMap (Overpass) ve OCM_API_KEY ortam değişkeni varsa Open Charge Map.
-Uygulama bu listeyi gömülü olarak taşır; NiroDrive-releases reposundaki haftalık GitHub Actions
-işi de aynı betikle listeyi yeniler, uygulama yeni listeyi haftada bir indirir.
-
-Kullanım: python3 scripts/update_chargers.py [--osm overpass.json] [--out yol]
 """
-import argparse
-import json
-import math
-import os
-import re
-import sys
-import urllib.parse
-import urllib.request
+Türkiye şarj istasyonu listesini üretir (chargers_tr.json). NiroDrive-releases'teki haftalık
+GitHub Actions bu betiği çalıştırır; uygulama listeyi oradan indirir.
 
-QUERY = ('[out:json][timeout:170];area["ISO3166-1"="TR"][admin_level=2]->.a;'
-         'nwr["amenity"="charging_station"](area.a);out tags center;')
-OVERPASS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-    "https://overpass.private.coffee/api/interpreter",
-]
-OCM_URL = "https://api.openchargemap.io/v3/poi?output=json&countrycode=TR&maxresults=20000&compact=true&verbose=false"
-DEFAULT_OUT = os.path.join(os.path.dirname(__file__), "..", "app", "src", "main", "assets", "chargers_tr.json")
-UA = {"User-Agent": "NiroDrive charger list (github.com/balistic00)"}
+Kaynak: EPDK Şarj Haritası (sarjtr.epdk.gov.tr), tüm lisanslı firmaların resmi listesi.
+Her istasyonun detayından soket türü (DC/AC) ve gücü (kW) okunur.
+EPDK yanıt vermezse eski yöntem (OpenStreetMap / Overpass) kullanılır.
+
+Çıktı: {"updated": "YYYY-MM-DD", "sources": [...], "items": [[lat, lon, dc(0/1), ad, maxKw, epdkId], ...]}
+Uygulama ilk 4 alanı okur; 5. ve 6. alanlar (kW, EPDK numarası) v1.13.0'dan beri kullanılır.
+"""
+import argparse, datetime, http.client, json, sys, time, urllib.parse, urllib.request
+from concurrent.futures import ThreadPoolExecutor
+from zoneinfo import ZoneInfo
+
+EPDK = "https://sarjtr.epdk.gov.tr/sarjet/api/stations"
+# EPDK, tarayıcı dışı istemcilere yalnızca bu User-Agent ile yanıt veriyor (aksi halde 403).
+HEADERS = {"User-Agent": "Dart/3.1 (dart:io)", "Accept": "application/json"}
+OVERPASS = "https://overpass-api.de/api/interpreter"
 
 
-def fetch_osm():
-    body = urllib.parse.urlencode({"data": QUERY}).encode()
-    for url in OVERPASS:
+def get_json(url, timeout=60, tries=3, pause=2.0):
+    """URL'den JSON okur; hata olursa birkaç kez bekleyip tekrar dener."""
+    for i in range(tries):
         try:
-            return json.load(urllib.request.urlopen(urllib.request.Request(url, body, UA), timeout=200))
-        except Exception as e:  # noqa: BLE001
-            print(url, e, file=sys.stderr)
-    sys.exit("Overpass yanıt vermedi")
+            # urllib "Connection: close" gönderiyor; EPDK buna bazen hiç yanıt vermiyor, http.client sorunsuz.
+            u = urllib.parse.urlsplit(url)
+            c = http.client.HTTPSConnection(u.netloc, timeout=timeout)
+            try:
+                c.request("GET", u.path + ("?" + u.query if u.query else ""), headers=HEADERS)
+                r = c.getresponse()
+                if r.status != 200:
+                    raise RuntimeError(f"HTTP {r.status}")
+                return json.loads(r.read())
+            finally:
+                c.close()
+        except Exception:
+            if i == tries - 1:
+                raise
+            time.sleep(pause * (i + 1))
 
 
-def osm_dc(t):
-    if any(k.startswith(("socket:type2_combo", "socket:chademo", "socket:ccs")) for k in t):
-        return True
-    m = re.search(r"(\d+)\s*kW", t.get("charging_station:output") or t.get("socket:type2_combo:output") or "")
-    return bool(m and int(m.group(1)) >= 40)
+def detail_url(sid):
+    """İstasyon detay adresi; EPDK bir önceki dakikanın Türkiye saatini istiyor."""
+    stamp = (datetime.datetime.now(ZoneInfo("Europe/Istanbul")) - datetime.timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:00")
+    return f"{EPDK}/id/{sid}/{urllib.parse.quote(stamp)}"
 
 
-def osm_items(data):
-    for e in data["elements"]:
-        t = e.get("tags", {})
-        lat = e.get("lat", e.get("center", {}).get("lat"))
-        lon = e.get("lon", e.get("center", {}).get("lon"))
-        if lat is None or lon is None:
-            continue
-        name = next((t[k] for k in ("name", "operator", "brand", "network") if t.get(k)), "")
-        yield [round(lat, 5), round(lon, 5), 1 if osm_dc(t) else 0, name]
+def load_previous(path):
+    """Önceki listedeki istasyonların DC/kW bilgisi (EPDK numarasına göre); detayı tekrar sorulmaz."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return {i[5]: (i[2], i[4]) for i in json.load(f)["items"] if len(i) >= 6 and i[5] and i[4] > 0}
+    except Exception:
+        return {}
 
 
-def ocm_items(key):
-    req = urllib.request.Request(OCM_URL, headers={**UA, "X-API-Key": key})
-    for p in json.load(urllib.request.urlopen(req, timeout=200)):
-        a = p.get("AddressInfo") or {}
-        lat, lon = a.get("Latitude"), a.get("Longitude")
-        if lat is None or lon is None:
-            continue
-        # CurrentTypeID 30 = DC, LevelID 3 = hızlı şarj.
-        dc = any(c.get("CurrentTypeID") == 30 or c.get("LevelID") == 3 or (c.get("PowerKW") or 0) >= 40
-                 for c in p.get("Connections") or [])
-        yield [round(lat, 5), round(lon, 5), 1 if dc else 0, a.get("Title") or ""]
+def epdk_items(workers, known, delay, budget_min):
+    """EPDK listesini alır; detayı yalnızca yeni istasyonlar için, sunucuyu yormadan yavaşça sorar."""
+    stations = get_json(EPDK, timeout=120, tries=5)
+    done = [0]
+    stop_at = time.time() + budget_min * 60
+
+    def one(s):
+        done[0] += 1
+        if done[0] % 500 == 0:
+            print(f"{done[0]}/{len(stations)} istasyon", file=sys.stderr, flush=True)
+        name = " ".join(x for x in [s.get("brand"), s.get("title")] if x).strip()
+        row = [round(s["lat"], 5), round(s["lng"], 5), 0, name, 0, s["id"]]
+        if s["id"] in known:
+            row[2], row[4] = known[s["id"]]
+            return row
+        if time.time() > stop_at:
+            return row  # süre doldu; kalanlar bir sonraki çalıştırmada sorulur
+        time.sleep(delay)
+        try:
+            # EPDK isteklerin yarıdan fazlasına hiç yanıt vermiyor (rastgele, yükten bağımsız); kısa bekleyip tekrar sormak en hızlısı.
+            sockets = get_json(detail_url(s["id"]), timeout=3, tries=8, pause=0.1).get("sockets") or []
+        except Exception:
+            return row  # bu hafta alınamadı; gelecek hafta tekrar denenir
+        row[2] = 1 if any(k.get("type") == "DC" for k in sockets) else 0
+        row[4] = round(max((k.get("power") or 0 for k in sockets), default=0))
+        return row
+    with ThreadPoolExecutor(workers) as ex:
+        return list(ex.map(one, stations))
 
 
-def dist_m(a, b):
-    x = math.radians(b[1] - a[1]) * math.cos(math.radians((a[0] + b[0]) / 2))
-    return math.hypot(x, math.radians(b[0] - a[0])) * 6371000
-
-
-def merge(items):
-    """~100 m içindeki kayıtlar aynı istasyon sayılır; DC bilgisi ve ilk dolu ad korunur."""
-    grid = {}
+def osm_items():
+    """Yedek: OpenStreetMap'teki Türkiye istasyonları (DC bilgisi eksik)."""
+    q = '[out:json][timeout:180];area["ISO3166-1"="TR"]->.a;nwr["amenity"="charging_station"](area.a);out center;'
+    req = urllib.request.Request(OVERPASS, data=urllib.parse.urlencode({"data": q}).encode(), headers={"User-Agent": "NiroDrive"})
+    with urllib.request.urlopen(req, timeout=240) as r:
+        data = json.load(r)
     out = []
-    for it in items:
-        cell = (round(it[0] * 100), round(it[1] * 100))
-        near = [o for dx in (-1, 0, 1) for dy in (-1, 0, 1) for o in grid.get((cell[0] + dx, cell[1] + dy), [])]
-        same = next((o for o in near if dist_m(o, it) < 100), None)
-        if same:
-            same[2] = same[2] or it[2]
-            same[3] = same[3] or it[3]
-        else:
-            out.append(it)
-            grid.setdefault(cell, []).append(it)
-    return sorted(out)
+    for e in data.get("elements", []):
+        lat = e.get("lat") or e.get("center", {}).get("lat")
+        lon = e.get("lon") or e.get("center", {}).get("lon")
+        t = e.get("tags", {})
+        dc = any(k.startswith(("socket:type2_combo", "socket:chademo", "socket:ccs")) for k in t)
+        if lat and lon:
+            out.append([round(lat, 5), round(lon, 5), 1 if dc else 0, t.get("name") or t.get("operator") or "", 0, 0])
+    return out
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--osm", help="hazır Overpass yanıtı (json)")
-    ap.add_argument("--out", default=DEFAULT_OUT)
+    ap.add_argument("--out", default="chargers_tr.json")
+    ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--delay", type=float, default=0.3, help="detay istekleri arası bekleme (sn)")
+    ap.add_argument("--budget", type=float, default=300, help="detay sorgusu için en fazla süre (dk)")
     args = ap.parse_args()
-    osm = json.load(open(args.osm)) if args.osm else fetch_osm()
-    items = list(osm_items(osm))
-    sources = ["osm"]
-    key = os.environ.get("OCM_API_KEY", "").strip()
-    if key:
-        try:
-            items += list(ocm_items(key))
-            sources.append("ocm")
-        except Exception as e:  # noqa: BLE001
-            print("Open Charge Map:", e, file=sys.stderr)
-    items = merge(items)
+    try:
+        items, sources = epdk_items(args.workers, load_previous(args.out), args.delay, args.budget), ["epdk"]
+    except Exception as e:
+        if load_previous(args.out):
+            sys.exit(f"EPDK alınamadı ({e}); eski EPDK listesi olduğu gibi bırakıldı")
+        print(f"EPDK alınamadı ({e}), OpenStreetMap kullanılıyor", file=sys.stderr)
+        items, sources = osm_items(), ["osm"]
     if len(items) < 300:
         sys.exit(f"Liste şüpheli derecede kısa ({len(items)}), yazılmadı")
-    updated = osm.get("osm3s", {}).get("timestamp_osm_base", "")[:10]
+    updated = datetime.date.today().isoformat()
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump({"updated": updated, "sources": sources, "items": items}, f, ensure_ascii=False, separators=(",", ":"))
     print(f"{len(items)} istasyon, {sum(i[2] for i in items)} DC, kaynak: {'+'.join(sources)} -> {args.out}")
