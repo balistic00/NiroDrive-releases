@@ -2,16 +2,21 @@ name: Şarj istasyonu listesi
 
 on:
   schedule:
-    - cron: "0 3 * * 1"   # her pazartesi 06:00 (TR)
+    - cron: "17 */6 * * *"   # 6 saatte bir; detayı eksik istasyonlar her çalıştırmada biraz daha tamamlanır, tamamlanınca birkaç dakikada biter
   workflow_dispatch:
 
 permissions:
   contents: write
 
+# Önceki çalıştırma bitmeden yenisi başlamasın.
+concurrency:
+  group: chargers
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
-    # İlk çalıştırmada ~13.000 istasyonun detayı yavaşça sorulur (birkaç saat); sonraki haftalar yalnızca yeni istasyonlar.
+    # EPDK detay sorgusu çok yavaş (~1.200 istasyon / 5 saat); bilinen istasyonlar tekrar sorulmaz, yalnızca eksikler ve yeniler.
     timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
