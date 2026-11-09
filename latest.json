@@ -1,5 +1,5 @@
 {
-  "versionName": "1.12.1",
-  "notes": "- Panelde batarya sıcaklığı en soğuk–en sıcak değerle ve renkli gösteriliyor (soğukta sarı, 45 °C üstü kırmızı). 15 °C altında \"DC şarj gücü düşük olabilir\" uyarısı çıkıyor; şarj gücünü batarya sıcaklığı belirler.\n- Kullanılmayan kodlar silindi (eski TelemetryRepository, SlopeCalculator, MetricCards, kullanılmayan PID başlıkları ve sorgular).\n- Tüm Kotlin dosyalarına ve sınıflara Türkçe açıklama eklendi; projenin tamamını anlatan döküman: docs/PROJE.md.",
-  "apkUrl": "https://github.com/balistic00/NiroDrive-releases/releases/download/v1.12.1/NiroDrive-v1.12.1.apk"
+  "versionName": "1.13.0",
+  "notes": "- İstasyon listesi artık EPDK'nın resmi Şarj Haritası'ndan geliyor: ~650 yerine ~13.000 istasyon (ZES, Trugo, Eşarj, Voltrun…), her biri için DC/AC ve en yüksek kW. Liste GitHub'da 6 saatte bir yenileniyor, telefon 2 günde bir indiriyor. EPDK detayları yavaş verdiği için DC/kW bilgisi ilk günlerde istasyonların bir kısmında var; eksikler her yenilemede tamamlanıyor, bilinmeyenlerde \"Durum\" türü gösteriyor.\n- Android Auto desteği: araç ekranında yakındaki şarj istasyonları (harita + liste, Sadece DC/Tümü, dokununca navigasyon) ve \"Yolculuk\" ekranı (şarj %, menzil, batarya sıcaklığı, kalan km, tahmini varış şarjı, sonraki şarj molası).\n- İstasyon sekmesinde \"Durum\" düğmesi: o anki boş soket sayısı (DC ayrı) ve kWh fiyatı EPDK'dan okunur.",
+  "apkUrl": "https://github.com/balistic00/NiroDrive-releases/releases/download/v1.13.0/NiroDrive-v1.13.0.apk"
 }
