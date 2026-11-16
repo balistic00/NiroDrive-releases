@@ -67,7 +67,8 @@ def epdk_items(workers, known, delay, budget_min):
         if done[0] % 500 == 0:
             print(f"{done[0]}/{len(stations)} istasyon", file=sys.stderr, flush=True)
         name = " ".join(x for x in [s.get("brand"), s.get("title")] if x).strip()
-        row = [round(s["lat"], 5), round(s["lng"], 5), 0, name, 0, s["id"]]
+        # Sütunlar: enlem, boylam, DC(0/1), ad, en yüksek kW, EPDK no, marka (uygulamadaki marka filtresi için).
+        row = [round(s["lat"], 5), round(s["lng"], 5), 0, name, 0, s["id"], (s.get("brand") or "").strip()]
         if s["id"] in known:
             row[2], row[4] = known[s["id"]]
             return row
@@ -99,7 +100,7 @@ def osm_items():
         t = e.get("tags", {})
         dc = any(k.startswith(("socket:type2_combo", "socket:chademo", "socket:ccs")) for k in t)
         if lat and lon:
-            out.append([round(lat, 5), round(lon, 5), 1 if dc else 0, t.get("name") or t.get("operator") or "", 0, 0])
+            out.append([round(lat, 5), round(lon, 5), 1 if dc else 0, t.get("name") or t.get("operator") or "", 0, 0, t.get("operator") or t.get("brand") or ""])
     return out
 
 
