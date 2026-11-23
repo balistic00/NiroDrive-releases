@@ -1,5 +1,5 @@
 {
-  "versionName": "1.24.0",
-  "notes": "- Güzergâh kartlarında en az kWh harcayan seçenek yeşil \"En az enerji\" işaretiyle gösteriliyor (en hızlı güzergâha göre kaç kWh az harcadığı da yazıyor). Sıra değişmedi: ilk kart yine en hızlısı.\n- \"Üzerinden\" alanına virgülle birden çok yer yazılabiliyor (ör. \"Amasya, Bayburt\", en fazla 5). Rota bu yerlerden yazılan sırayla geçiyor; Google Haritalar'a da hepsi ara durak olarak gidiyor. Tek ara noktayla OSRM'in Google'dan farklı yol seçtiği durumlarda (ör. Ankara–Amasya–Yusufeli'de Samsun sahili) istenen yol bu şekilde birebir çiziliyor.",
-  "apkUrl": "https://github.com/balistic00/NiroDrive-releases/releases/download/v1.24.0/NiroDrive-v1.24.0.apk"
+  "versionName": "1.25.0",
+  "notes": "- Android Auto \"Yolculuk\" ekranı OBD yokken GPS modunu kullanıyor: tahmini şarj, ≈ menzil ve ≈ ortalama tüketim \"tahmini\" / \"GPS modu\" diye gösteriliyor; OBD olmadan bilinemeyen güç, sıcaklık ve anlık tüketim gösterilmiyor.\n- İlk satırın altında anlık ve ortalama tüketim (kWh/100 km), hız ve batarya sıcaklığı var.\n- Paneldeki sürüş tavsiyesi araç ekranına geldi. Turuncu/kırmızı uyarı yolculuk önerisinin önüne geçiyor; ikisi yoksa \"Verimli gidiyorsun\", \"Enerji geri kazanılıyor\" gibi tavsiye çıkıyor. Ekran Android Auto sınırı olan en fazla 4 satırda kalıyor.",
+  "apkUrl": "https://github.com/balistic00/NiroDrive-releases/releases/download/v1.25.0/NiroDrive-v1.25.0.apk"
 }
